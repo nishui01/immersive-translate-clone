@@ -15,6 +15,8 @@ export function applyStyle(settings: Settings) {
   style.textContent = `
     .it-translation {
       display: block;
+      width: 100%;
+      clear: both;
       margin: 0.5em 0 0 !important;
       padding: 0 !important;
       color: ${color} !important;
@@ -32,8 +34,6 @@ export function applyStyle(settings: Settings) {
     }
     .it-translation.it-loading { opacity: 0.5; font-style: italic !important; font-size: 80% !important; }
     .it-translation.it-error { color: #dc2626 !important; font-size: 80% !important; }
-    .it-original-hidden { font-size: 0 !important; line-height: 0 !important; }
-    .it-original-hidden > .it-translation { line-height: 1.7 !important; }
     #it-sel-popup {
       position: fixed;
       z-index: 2147483647;

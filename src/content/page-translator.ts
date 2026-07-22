@@ -5,6 +5,7 @@ import {
   collectBlocks,
   injectTranslation,
   clearAllTranslations,
+  getTranslationEntry,
   TRANSLATION_CLASS,
 } from './dom'
 
@@ -159,17 +160,29 @@ class PageTranslator {
 
   private applyDisplayMode(el: HTMLElement) {
     if (!this.settings) return
-    const translation = el.querySelector(':scope > .' + TRANSLATION_CLASS) as HTMLElement | null
+    const entry = getTranslationEntry(el)
+    const node = entry?.node
     if (this.settings.displayMode === 'translationOnly') {
-      // Read the original font size BEFORE hiding, then size the translation in px
-      // (percentages would resolve to 0 once the parent is set to font-size:0).
-      const base = parseFloat(getComputedStyle(el).fontSize) || 16
-      const px = (base * (this.settings.fontSize || 90)) / 100
-      translation?.style.setProperty('font-size', `${px}px`, 'important')
-      el.classList.add('it-original-hidden')
+      if (entry?.sibling) {
+        // Translation is a separate block; simply hide the original element.
+        el.style.setProperty('display', 'none', 'important')
+      } else {
+        // Translation is a child of the original; we cannot display:none the
+        // original (that would hide the translation too). Collapse the original
+        // text via font-size:0 and size the translation in px instead.
+        const base = parseFloat(getComputedStyle(el).fontSize) || 16
+        const px = (base * (this.settings.fontSize || 90)) / 100
+        el.style.setProperty('font-size', '0', 'important')
+        el.style.setProperty('line-height', '0', 'important')
+        node?.style.setProperty('font-size', `${px}px`, 'important')
+        node?.style.setProperty('line-height', '1.7', 'important')
+      }
     } else {
-      el.classList.remove('it-original-hidden')
-      translation?.style.removeProperty('font-size')
+      el.style.removeProperty('display')
+      el.style.removeProperty('font-size')
+      el.style.removeProperty('line-height')
+      node?.style.removeProperty('font-size')
+      node?.style.removeProperty('line-height')
     }
   }
 
