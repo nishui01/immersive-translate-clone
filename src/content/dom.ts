@@ -96,36 +96,48 @@ export interface CollectedBlock {
   text: string
 }
 
-export function collectBlocks(root: ParentNode = document.body, max = 1000): CollectedBlock[] {
+export function collectBlocks(
+  root: ParentNode = document.body,
+  max = 1000,
+  targetLang?: string,
+): CollectedBlock[] {
   const out: CollectedBlock[] = []
-  // Walk the DOM rather than querySelectorAll to apply custom filters efficiently.
-  const walker = document.createTreeWalker(root as Node, NodeFilter.SHOW_ELEMENT, {
-    acceptNode(node) {
-      const el = node as Element
-      if (EXCLUDE_TAGS.has(el.tagName)) return NodeFilter.FILTER_REJECT
-      if (el.classList?.contains(TRANSLATION_CLASS)) return NodeFilter.FILTER_REJECT
-      return NodeFilter.FILTER_ACCEPT
-    },
-  })
+  const rootEl = root as Element
+  // Manual DFS so that once a block-level element is collected we do NOT recurse
+  // into its descendants — this is what prevents duplicate translations of nested
+  // inline elements (e.g. <strong>/<span> inside a <p>).
+  const stack: Element[] = []
+  const startNodes = rootEl.children?.length ? Array.from(rootEl.children) : [rootEl]
+  for (let i = startNodes.length - 1; i >= 0; i--) stack.push(startNodes[i])
 
-  const candidates: Element[] = []
-  while (walker.nextNode()) {
-    const el = walker.currentNode as Element
+  while (stack.length) {
+    if (out.length >= max) break
+    const el = stack.pop()!
+    if (EXCLUDE_TAGS.has(el.tagName)) continue
+    if (el.classList?.contains(TRANSLATION_CLASS)) continue
     if (el.getAttribute(TRANSLATED_ATTR)) continue
+    if (inExcludedContext(el)) continue
+
     const tag = el.tagName
     const isBlock = TRANSLATABLE_TAGS.has(tag)
     const isLeafText = LEAF_TEXT_TAGS.has(tag) && !hasElementChildren(el)
-    if (!isBlock && !isLeafText) continue
-    if (inExcludedContext(el)) continue
-    candidates.push(el)
-    if (candidates.length > max * 2) break
-  }
 
-  for (const el of candidates) {
-    if (out.length >= max) break
-    const text = meaningfulText(el)
-    if (!isWorthTranslating(text)) continue
-    out.push({ el: el as HTMLElement, text })
+    if (isBlock || isLeafText) {
+      const text = meaningfulText(el)
+      if (isWorthTranslating(text)) {
+        const sameLang = targetLang ? isLikelySameLanguage(text, targetLang) : false
+        if (!sameLang) {
+          out.push({ el: el as HTMLElement, text })
+        }
+        // Treat this element as a single translation unit; do not descend.
+        continue
+      }
+      // Not worth translating (e.g. empty): still descend to find inner content.
+    }
+
+    // Recurse: push children in reverse so they are visited in document order.
+    const kids = el.children
+    for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i])
   }
   return out
 }

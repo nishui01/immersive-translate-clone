@@ -15,20 +15,25 @@ export function applyStyle(settings: Settings) {
   style.textContent = `
     .it-translation {
       display: block;
-      margin-top: 4px !important;
-      margin-bottom: 0 !important;
+      margin: 0.5em 0 0 !important;
+      padding: 0 !important;
       color: ${color} !important;
       font-size: ${fontSize}% !important;
-      line-height: 1.6 !important;
+      line-height: 1.7 !important;
       font-weight: 400 !important;
-      text-align: left !important;
+      font-style: normal !important;
+      text-align: inherit !important;
+      text-indent: 0 !important;
       word-break: break-word;
+      overflow-wrap: break-word;
       transition: opacity 0.2s ease;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
     }
-    .it-translation.it-loading { opacity: 0.45; font-style: italic; }
+    .it-translation.it-loading { opacity: 0.5; font-style: italic !important; font-size: 80% !important; }
     .it-translation.it-error { color: #dc2626 !important; font-size: 80% !important; }
     .it-original-hidden { font-size: 0 !important; line-height: 0 !important; }
-    .it-original-hidden > .it-translation { line-height: 1.6 !important; }
+    .it-original-hidden > .it-translation { line-height: 1.7 !important; }
     #it-sel-popup {
       position: fixed;
       z-index: 2147483647;

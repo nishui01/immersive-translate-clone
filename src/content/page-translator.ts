@@ -5,7 +5,6 @@ import {
   collectBlocks,
   injectTranslation,
   clearAllTranslations,
-  isLikelySameLanguage,
   TRANSLATION_CLASS,
 } from './dom'
 
@@ -66,7 +65,30 @@ class PageTranslator {
 
   private startObserver() {
     if (this.observer) return
-    this.observer = new MutationObserver(() => {
+    this.observer = new MutationObserver((mutations) => {
+      // Ignore mutations that only add our own translation nodes / style,
+      // so injecting translations doesn't trigger redundant re-translation.
+      let external = false
+      for (const m of mutations) {
+        for (const node of m.addedNodes) {
+          if (node.nodeType !== 1) {
+            external = true
+            break
+          }
+          const el = node as Element
+          const ours =
+            el.classList?.contains(TRANSLATION_CLASS) ||
+            el.id === 'it-style' ||
+            el.tagName === 'STYLE' ||
+            el.getAttribute?.('data-it') === '1'
+          if (!ours) {
+            external = true
+            break
+          }
+        }
+        if (external) break
+      }
+      if (!external) return
       if (this.debounceTimer) window.clearTimeout(this.debounceTimer)
       this.debounceTimer = window.setTimeout(() => {
         if (!this.enabled || !this.settings) return
@@ -88,9 +110,7 @@ class PageTranslator {
 
   private async translateAll(id: number) {
     const settings = this.settings!
-    const blocks = collectBlocks(document.body, MAX_BLOCKS).filter(
-      (b) => !isLikelySameLanguage(b.text, settings.targetLang),
-    )
+    const blocks = collectBlocks(document.body, MAX_BLOCKS, settings.targetLang)
     await this.translateBlocks(blocks, id, settings)
     this.notifyTranslated()
   }
@@ -98,9 +118,7 @@ class PageTranslator {
   private async translateNew(id: number) {
     const settings = this.settings!
     if (id !== this.runId) return
-    const blocks = collectBlocks(document.body, 200).filter(
-      (b) => !isLikelySameLanguage(b.text, settings.targetLang),
-    )
+    const blocks = collectBlocks(document.body, 200, settings.targetLang)
     if (!blocks.length) return
     await this.translateBlocks(blocks, id, settings)
   }
