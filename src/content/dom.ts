@@ -2,7 +2,7 @@
 
 const TRANSLATABLE_TAGS = new Set([
   'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'BLOCKQUOTE', 'TD', 'TH',
-  'FIGCAPTION', 'DT', 'DD', 'SUMMARY', 'CAPTION', 'DT', 'DD',
+  'FIGCAPTION', 'DT', 'DD', 'SUMMARY', 'CAPTION',
 ])
 // div/span are only translated when they have no element children (pure text leaves).
 const LEAF_TEXT_TAGS = new Set(['DIV', 'SPAN', 'A', 'STRONG', 'EM', 'B', 'I'])
@@ -11,6 +11,18 @@ const EXCLUDE_TAGS = new Set([
   'INPUT', 'SELECT', 'OPTION', 'SVG', 'OBJECT', 'VIDEO', 'AUDIO', 'CANVAS',
   'BUTTON', 'IFRAME', 'TEMPLATE',
 ])
+
+// Elements that own a block layout and live in a flow container — for these we
+// insert the translation as a *sibling* (after the element). This is the key
+// fix for the "translation aligns to a floating image / leading bullet" issue:
+// by living outside the original element, the translation can't be pushed around
+// by floats or inline content inside the original paragraph.
+const SIBLING_INSERT_TAGS = new Set([
+  'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'FIGCAPTION',
+  'DT', 'DD', 'SUMMARY', 'CAPTION',
+])
+// Container-like elements where a sibling insertion would break layout
+// (e.g. <li>, <td>) — for these we keep the translation as a child.
 
 export const TRANSLATION_CLASS = 'it-translation'
 export const TRANSLATED_ATTR = 'data-it-translated'
@@ -143,23 +155,48 @@ export function collectBlocks(
 }
 
 export function createTranslationEl(text: string, state: 'loading' | 'done' | 'error'): HTMLElement {
-  const node = document.createElement('span')
+  // Use a <div> (block) instead of <span> so the translation naturally occupies
+  // its own line and we can apply clear/width reliably for both insertion modes.
+  const node = document.createElement('div')
   node.className = TRANSLATION_CLASS + (state === 'loading' ? ' it-loading' : state === 'error' ? ' it-error' : '')
   node.setAttribute('data-it', '1')
   node.textContent = text
   return node
 }
 
+// Decide whether the translation for this element should be inserted as a
+// sibling (after it) or as a child. Sibling insertion avoids being affected by
+// floats / inline content inside the original element.
+function shouldInsertAsSibling(el: HTMLElement): boolean {
+  return SIBLING_INSERT_TAGS.has(el.tagName)
+}
+
 export function injectTranslation(el: HTMLElement, text: string, state: 'loading' | 'done' | 'error') {
   removeTranslation(el)
   const node = createTranslationEl(text, state)
   el.setAttribute(TRANSLATED_ATTR, '1')
-  el.appendChild(node)
+  if (shouldInsertAsSibling(el) && el.parentElement) {
+    // Insert as the next sibling so the translation lives outside the original
+    // element's inline flow — this is what makes it align to the paragraph's
+    // left edge instead of to a leading image/bullet.
+    el.after(node)
+  } else {
+    el.appendChild(node)
+  }
 }
 
 export function removeTranslation(el: HTMLElement) {
+  // Child mode: a direct child with the translation class.
   const child = el.querySelector(':scope > .' + TRANSLATION_CLASS)
-  if (child) child.remove()
+  if (child) {
+    child.remove()
+    return
+  }
+  // Sibling mode: a following sibling with the translation class.
+  const next = el.nextElementSibling
+  if (next && next.classList?.contains(TRANSLATION_CLASS)) {
+    next.remove()
+  }
 }
 
 export function clearAllTranslations(_root: ParentNode = document.body) {
@@ -170,6 +207,12 @@ export function clearAllTranslations(_root: ParentNode = document.body) {
     // Reset inline styles applied by display-mode handling.
     el.style.removeProperty('font-size')
     el.style.removeProperty('line-height')
+    el.style.removeProperty('display')
     removeTranslation(el)
+  })
+  // Also clean up any orphaned translation nodes (defensive).
+  document.querySelectorAll('.' + TRANSLATION_CLASS).forEach((n) => {
+    const t = n as HTMLElement
+    if (!t.closest('[' + TRANSLATED_ATTR + ']')) t.remove()
   })
 }

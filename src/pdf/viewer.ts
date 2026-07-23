@@ -447,10 +447,43 @@ function showEmptyState() {
   const content = document.getElementById('content')!
   content.innerHTML = ''
   const empty = el('div', 'empty-state')
-  const icon = el('div', 'empty-icon', '📄')
-  const title = el('div', 'empty-title', '打开一个 PDF 文件')
-  const desc = el('div', 'empty-desc', '点击上方"打开 PDF"按钮，选择本地 PDF 文件进行翻译')
-  empty.append(icon, title, desc)
+
+  const dropzone = el('div', 'dropzone')
+  dropzone.id = 'dropzone'
+  const icon = el('div', 'dropzone-icon', '📄')
+  const title = el('div', 'dropzone-title', '打开 PDF 进行翻译')
+  const desc = el('div', 'dropzone-desc', '点击选择文件，或将 PDF 文件拖到此区域')
+  const pickBtn = el('button', 'dropzone-btn', '选择 PDF 文件')
+  pickBtn.addEventListener('click', () => {
+    document.getElementById('file-input')!.click()
+  })
+  dropzone.append(icon, title, desc, pickBtn)
+
+  // Drag-and-drop handlers
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault()
+    dropzone.classList.add('dragover')
+  })
+  dropzone.addEventListener('dragleave', () => {
+    dropzone.classList.remove('dragover')
+  })
+  dropzone.addEventListener('drop', async (e) => {
+    e.preventDefault()
+    dropzone.classList.remove('dragover')
+    const file = e.dataTransfer?.files?.[0]
+    if (!file) return
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      const tip = el('div', 'dropzone-error', '只支持 PDF 文件')
+      dropzone.querySelector('.dropzone-error')?.remove()
+      dropzone.appendChild(tip)
+      return
+    }
+    const url = URL.createObjectURL(file)
+    currentFileName = file.name
+    await loadPdf(url)
+  })
+
+  empty.appendChild(dropzone)
   content.appendChild(empty)
 }
 
@@ -458,6 +491,20 @@ function showEmptyState() {
 async function init() {
   settings = await getSettings()
   buildApp()
+
+  // Global drag-and-drop: drop a PDF anywhere on the window to load it.
+  window.addEventListener('dragover', (e) => {
+    e.preventDefault()
+  })
+  window.addEventListener('drop', async (e) => {
+    e.preventDefault()
+    const file = e.dataTransfer?.files?.[0]
+    if (!file) return
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) return
+    const url = URL.createObjectURL(file)
+    currentFileName = file.name
+    await loadPdf(url)
+  })
 
   const params = new URLSearchParams(location.search)
   const fileUrl = params.get('file')

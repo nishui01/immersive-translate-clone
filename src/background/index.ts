@@ -49,7 +49,46 @@ chrome.runtime.onInstalled.addListener(async () => {
   } catch {
     // already exists
   }
+  // Context menu: open the current PDF page in our translator viewer.
+  // documentUrlPatterns restricts it to .pdf URLs so it only shows up where it's useful.
+  try {
+    chrome.contextMenus.create({
+      id: 'translate-pdf-page',
+      title: '📄 用沉浸式翻译打开此 PDF',
+      contexts: ['page'],
+      documentUrlPatterns: ['*://*/*.pdf', '*://*/*.pdf?*', '*://*/*.pdf#*', 'file:///*.pdf'],
+    })
+  } catch {
+    // already exists
+  }
+  // Context menu: open a PDF link target in our translator viewer.
+  try {
+    chrome.contextMenus.create({
+      id: 'translate-pdf-link',
+      title: '📄 用沉浸式翻译打开此 PDF 链接',
+      contexts: ['link'],
+      targetUrlPatterns: ['*://*/*.pdf', '*://*/*.pdf?*', '*://*/*.pdf#*', 'file:///*.pdf'],
+    })
+  } catch {
+    // already exists
+  }
+  // Context menu: a general entry that opens the viewer (file picker) from any page.
+  try {
+    chrome.contextMenus.create({
+      id: 'open-pdf-translator',
+      title: '📄 打开 PDF 翻译器',
+      contexts: ['page'],
+    })
+  } catch {
+    // already exists
+  }
 })
+
+function openPdfViewer(fileUrl?: string) {
+  const viewerBase = chrome.runtime.getURL('src/pdf/viewer.html')
+  const viewerUrl = fileUrl ? viewerBase + '?file=' + encodeURIComponent(fileUrl) : viewerBase
+  void chrome.tabs.create({ url: viewerUrl })
+}
 
 // Keyboard shortcut: toggle translation on the active tab.
 chrome.commands?.onCommand.addListener(async (command) => {
@@ -61,12 +100,32 @@ chrome.commands?.onCommand.addListener(async (command) => {
 })
 
 // Context menu: translate selection in the active tab.
-chrome.contextMenus?.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId !== 'translate-selection' || !tab?.id) return
-  try {
-    await chrome.tabs.sendMessage(tab.id, { type: 'TRANSLATE_SELECTION_CONTEXT' })
-  } catch {
-    // ignore
+chrome.contextMenus?.onClicked.addListener((info, tab) => {
+  switch (info.menuItemId) {
+    case 'translate-selection': {
+      if (!tab?.id) return
+      try {
+        void chrome.tabs.sendMessage(tab.id, { type: 'TRANSLATE_SELECTION_CONTEXT' })
+      } catch {
+        // ignore
+      }
+      return
+    }
+    case 'translate-pdf-page': {
+      // Open the current page's URL in our viewer.
+      const url = info.pageUrl || tab?.url
+      if (url) openPdfViewer(url)
+      return
+    }
+    case 'translate-pdf-link': {
+      // Open the link target in our viewer.
+      if (info.linkUrl) openPdfViewer(info.linkUrl)
+      return
+    }
+    case 'open-pdf-translator': {
+      openPdfViewer()
+      return
+    }
   }
 })
 

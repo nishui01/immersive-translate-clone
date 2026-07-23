@@ -10,26 +10,49 @@ export function applyStyle(settings: Settings) {
     style.id = STYLE_ID
     document.documentElement.appendChild(style)
   }
-  const color = settings.translationColor || '#6B7280'
+  const color = settings.translationColor || '#4b5563'
   const fontSize = settings.fontSize || 92
   style.textContent = `
+    /* Translation block — used for both sibling-inserted and child-inserted modes.
+       Key layout goals:
+       - display:block so the translation always lives on its own line
+       - clear:both so a floating image inside the original paragraph can't push
+         the translation to the right or make it wrap early
+       - width:100% + box-sizing:border-box so the translation matches the
+         original element's content-box width and aligns to its left edge
+       - inherit text-align so the translation follows the original alignment
+       - inherit font-family so the page's font stack is reused (better than
+         forcing a generic sans-serif which often clashes with the page)
+    */
     .it-translation {
-      display: block;
-      margin: 3px 0 0 !important;
+      display: block !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+      clear: both !important;
+      margin: 4px 0 0 !important;
       padding: 0 !important;
       color: ${color} !important;
       font-size: ${fontSize}% !important;
-      line-height: 1.6 !important;
+      line-height: 1.65 !important;
       font-weight: 400 !important;
       font-style: normal !important;
       text-align: inherit !important;
       text-indent: 0 !important;
+      letter-spacing: normal !important;
       word-break: break-word;
       overflow-wrap: break-word;
+      hyphens: none;
       transition: opacity 0.2s ease;
     }
-    .it-translation.it-loading { opacity: 0.5; font-style: italic !important; }
-    .it-translation.it-error { color: #dc2626 !important; font-size: 80% !important; }
+    .it-translation.it-loading {
+      opacity: 0.55;
+      font-style: italic !important;
+    }
+    .it-translation.it-error {
+      color: #dc2626 !important;
+      font-size: 80% !important;
+    }
+    /* Selection popup */
     #it-sel-popup {
       position: fixed;
       z-index: 2147483647;
@@ -53,6 +76,31 @@ export function applyStyle(settings: Settings) {
     #it-sel-popup .it-sel-close {
       position: absolute; top: 4px; right: 8px; cursor: pointer;
       color: #9ca3af; font-size: 14px; line-height: 1;
+    }
+    /* Floating "Translate this PDF" badge injected on native PDF viewer pages */
+    #it-pdf-fab {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 2147483647;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 18px;
+      border: none;
+      border-radius: 28px;
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.45);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    #it-pdf-fab:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px rgba(79, 70, 229, 0.55);
     }
   `
 }

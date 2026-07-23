@@ -4,6 +4,7 @@ import { applyStyle, removeStyle } from './style'
 import {
   collectBlocks,
   injectTranslation,
+  removeTranslation,
   clearAllTranslations,
   TRANSLATION_CLASS,
 } from './dom'
@@ -147,8 +148,7 @@ class PageTranslator {
           this.applyDisplayMode(b.el)
         } else {
           // no translation or identical: remove placeholder
-          const ph = b.el.querySelector(':scope > .' + TRANSLATION_CLASS)
-          if (ph) ph.remove()
+          removeTranslation(b.el)
           b.el.removeAttribute('data-it-translated')
         }
       })
@@ -157,23 +157,29 @@ class PageTranslator {
     }
   }
 
+  private findTranslation(el: HTMLElement): HTMLElement | null {
+    // Sibling-inserted: look at the immediate next sibling.
+    const next = el.nextElementSibling
+    if (next && next.classList?.contains(TRANSLATION_CLASS)) {
+      return next as HTMLElement
+    }
+    // Child-inserted: look for a direct child.
+    return el.querySelector(':scope > .' + TRANSLATION_CLASS) as HTMLElement | null
+  }
+
   private applyDisplayMode(el: HTMLElement) {
     if (!this.settings) return
-    const translation = el.querySelector(':scope > .' + TRANSLATION_CLASS) as HTMLElement | null
+    const translation = this.findTranslation(el)
     if (this.settings.displayMode === 'translationOnly') {
-      // Collapse original text via font-size:0 (can't display:none because the
-      // translation is a child). Size the translation in px so it's still visible.
-      const base = parseFloat(getComputedStyle(el).fontSize) || 16
-      const px = (base * (this.settings.fontSize || 92)) / 100
-      el.style.setProperty('font-size', '0', 'important')
-      el.style.setProperty('line-height', '0', 'important')
-      translation?.style.setProperty('font-size', `${px}px`, 'important')
-      translation?.style.setProperty('line-height', '1.6', 'important')
+      // Hide the original text entirely (works for both sibling and child
+      // insertion: with sibling insertion the original is a separate element,
+      // so display:none is safe and clean; with child insertion the original
+      // text nodes collapse but the translation child still shows).
+      el.style.setProperty('display', 'none', 'important')
+      translation?.style.removeProperty('display')
     } else {
-      el.style.removeProperty('font-size')
-      el.style.removeProperty('line-height')
-      translation?.style.removeProperty('font-size')
-      translation?.style.removeProperty('line-height')
+      el.style.removeProperty('display')
+      translation?.style.removeProperty('display')
     }
   }
 
