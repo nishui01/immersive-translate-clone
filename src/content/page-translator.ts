@@ -19,13 +19,16 @@ class PageTranslator {
   private observer: MutationObserver | null = null
   private debounceTimer: number | null = null
   // Periodic re-scan timers for SPA pages that load content dynamically
-  // (e.g. MSN, React/Vue SPAs). After enabling, we re-scan every few seconds
-  // for a short window to catch late-arriving content that the initial pass
-  // and the MutationObserver might miss.
+  // (e.g. MSN, React/Vue SPAs). We use exponential backoff: start at 2s,
+  // double up to 30s, and keep scanning indefinitely. This catches content
+  // that loads very late (after consent dialogs, lazy-load, infinite scroll).
   private rescanTimer: number | null = null
   private rescanCount = 0
-  private static readonly RESCAN_INTERVAL = 3000 // 3 seconds
-  private static readonly RESCAN_MAX = 10 // 10 scans = ~30 seconds total
+  private rescanInterval = 2000 // starts at 2s, grows via backoff
+  private static readonly RESCAN_MIN_INTERVAL = 2000
+  private static readonly RESCAN_MAX_INTERVAL = 30000
+  private lastBlockCount = 0
+  private stagnantCount = 0
 
   configure(settings: Settings) {
     const prev = this.settings
@@ -120,32 +123,63 @@ class PageTranslator {
     }
   }
 
-  /** Periodically re-scan for new content on SPA pages. */
+  /** Periodically re-scan for new content on SPA pages with exponential backoff. */
   private startRescan() {
     this.stopRescan()
     this.rescanCount = 0
-    this.rescanTimer = window.setInterval(() => {
+    this.rescanInterval = PageTranslator.RESCAN_MIN_INTERVAL
+    this.lastBlockCount = 0
+    this.stagnantCount = 0
+    this.scheduleRescan()
+  }
+
+  private scheduleRescan() {
+    if (this.rescanTimer) window.clearTimeout(this.rescanTimer)
+    this.rescanTimer = window.setTimeout(() => {
       if (!this.enabled || !this.settings) {
         this.stopRescan()
         return
       }
       this.rescanCount++
-      if (this.rescanCount > PageTranslator.RESCAN_MAX) {
-        this.stopRescan()
-        return
-      }
-      // Look for untranslated blocks; if found, translate them.
       const id = this.runId
-      void this.translateNew(id)
-    }, PageTranslator.RESCAN_INTERVAL)
+      void this.translateNewWithBackoff(id)
+    }, this.rescanInterval)
+  }
+
+  private async translateNewWithBackoff(id: number) {
+    if (id !== this.runId) return
+    const settings = this.settings!
+    const blocks = collectBlocks(document.body, 200, settings.targetLang)
+    const found = blocks.length
+    if (found > 0) {
+      // Found new content: translate it and reset backoff to catch more.
+      await this.translateBlocks(blocks, id, settings)
+      this.lastBlockCount = found
+      this.stagnantCount = 0
+      this.rescanInterval = PageTranslator.RESCAN_MIN_INTERVAL
+    } else {
+      // No new content: increase stagnation and back off.
+      this.stagnantCount++
+      if (this.stagnantCount > 3) {
+        // After 3 consecutive empty scans, back off exponentially up to max.
+        this.rescanInterval = Math.min(
+          this.rescanInterval * 2,
+          PageTranslator.RESCAN_MAX_INTERVAL,
+        )
+      }
+    }
+    // Schedule next scan (indefinite — keeps watching for late/infinite-scroll content).
+    this.scheduleRescan()
   }
 
   private stopRescan() {
     if (this.rescanTimer) {
-      window.clearInterval(this.rescanTimer)
+      window.clearTimeout(this.rescanTimer)
       this.rescanTimer = null
     }
     this.rescanCount = 0
+    this.lastBlockCount = 0
+    this.stagnantCount = 0
   }
 
   private async translateAll(id: number) {

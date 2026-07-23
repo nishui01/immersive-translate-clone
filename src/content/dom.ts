@@ -2,7 +2,8 @@
 
 const TRANSLATABLE_TAGS = new Set([
   'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'BLOCKQUOTE', 'TD', 'TH',
-  'FIGCAPTION', 'DT', 'DD', 'SUMMARY', 'CAPTION',
+  'FIGCAPTION', 'DT', 'DD', 'SUMMARY', 'CAPTION', 'ARTICLE', 'SECTION',
+  'MAIN', 'ASIDE', 'DETAILS',
 ])
 // div/span are only translated when they have no element children (pure text leaves).
 const LEAF_TEXT_TAGS = new Set(['DIV', 'SPAN', 'A', 'STRONG', 'EM', 'B', 'I'])
