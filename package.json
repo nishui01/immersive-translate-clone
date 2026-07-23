@@ -4,12 +4,13 @@
   "description": "A bilingual webpage translation browser extension, inspired by Immersive Translate.",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "node scripts/copy-worker.js && vite",
+    "build": "node scripts/copy-worker.js && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "pdfjs-dist": "^4.7.76",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

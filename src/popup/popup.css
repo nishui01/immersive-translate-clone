@@ -59,6 +59,23 @@ header {
   opacity: 0.7;
   cursor: default;
 }
+.pdf-btn {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-bottom: 14px;
+}
+.pdf-btn:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
 .row {
   display: flex;
   align-items: center;

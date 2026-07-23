@@ -15,22 +15,6 @@ const EXCLUDE_TAGS = new Set([
 export const TRANSLATION_CLASS = 'it-translation'
 export const TRANSLATED_ATTR = 'data-it-translated'
 
-// For these block-level elements the translation is inserted as a SIBLING block
-// right after the element. This keeps it out of the original's inline flow, so
-// floated images / leading icons no longer offset or squeeze the translation,
-// and it gets the parent's full width (less wrapping).
-const SIBLING_TAGS = new Set([
-  'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'FIGCAPTION', 'SUMMARY',
-])
-
-// Tracks the injected translation node for each translated element so we can
-// remove/replace it reliably regardless of sibling vs child insertion.
-const translationNodes = new Map<HTMLElement, { node: HTMLElement; sibling: boolean }>()
-
-export function getTranslationEntry(el: HTMLElement) {
-  return translationNodes.get(el)
-}
-
 function inExcludedContext(el: Element): boolean {
   let node: Element | null = el
   while (node) {
@@ -159,9 +143,6 @@ export function collectBlocks(
 }
 
 export function createTranslationEl(text: string, state: 'loading' | 'done' | 'error'): HTMLElement {
-  // A <span> with display:block is valid phrasing content everywhere (inside
-  // block containers as well as inside inline elements), so it is safe for both
-  // sibling and child insertion.
   const node = document.createElement('span')
   node.className = TRANSLATION_CLASS + (state === 'loading' ? ' it-loading' : state === 'error' ? ' it-error' : '')
   node.setAttribute('data-it', '1')
@@ -170,50 +151,25 @@ export function createTranslationEl(text: string, state: 'loading' | 'done' | 'e
 }
 
 export function injectTranslation(el: HTMLElement, text: string, state: 'loading' | 'done' | 'error') {
-  // Remove any previous translation node for this element.
   removeTranslation(el)
   const node = createTranslationEl(text, state)
-  const useSibling = SIBLING_TAGS.has(el.tagName) && el.parentNode !== null
-  if (useSibling) {
-    // Insert as a sibling block right after the original element. This is the
-    // key fix for the alignment problem: the translation is no longer a child
-    // sharing the original's inline flow, so leading floated images / icons do
-    // not offset or narrow it.
-    el.parentNode!.insertBefore(node, el.nextSibling)
-  } else {
-    // For list items, table cells, captions and inline leaves we keep child
-    // insertion (a block sibling would be invalid inside <ul>/<tr>, and for
-    // list items a block child correctly aligns after the list marker).
-    el.appendChild(node)
-  }
   el.setAttribute(TRANSLATED_ATTR, '1')
-  translationNodes.set(el, { node, sibling: useSibling })
+  el.appendChild(node)
 }
 
 export function removeTranslation(el: HTMLElement) {
-  const entry = translationNodes.get(el)
-  if (entry) {
-    entry.node.remove()
-    translationNodes.delete(el)
-    return
-  }
-  // Fallback for elements we did not track (e.g. cleared by other means).
-  const sib = el.nextElementSibling
-  if (sib && sib.classList.contains(TRANSLATION_CLASS)) sib.remove()
-  const child = el.querySelector(':scope > .it-translation')
+  const child = el.querySelector(':scope > .' + TRANSLATION_CLASS)
   if (child) child.remove()
 }
 
 export function clearAllTranslations(_root: ParentNode = document.body) {
-  for (const [el, entry] of translationNodes) {
-    entry.node.remove()
+  const nodes = document.querySelectorAll(`[${TRANSLATED_ATTR}]`)
+  nodes.forEach((n) => {
+    const el = n as HTMLElement
     el.removeAttribute(TRANSLATED_ATTR)
-    // Reset any inline styles applied by display-mode handling.
-    el.style.removeProperty('display')
+    // Reset inline styles applied by display-mode handling.
     el.style.removeProperty('font-size')
     el.style.removeProperty('line-height')
-    entry.node.style.removeProperty('font-size')
-    entry.node.style.removeProperty('line-height')
-  }
-  translationNodes.clear()
+    removeTranslation(el)
+  })
 }

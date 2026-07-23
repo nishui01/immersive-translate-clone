@@ -41,6 +41,16 @@ export default function Popup() {
     chrome.runtime.openOptionsPage()
   }
 
+  async function translatePdf() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    const url = tab?.url
+    if (!url) return
+    // Open PDF viewer in a new tab
+    const viewerUrl = chrome.runtime.getURL('src/pdf/viewer.html') + '?file=' + encodeURIComponent(url)
+    await chrome.tabs.create({ url: viewerUrl })
+    window.close()
+  }
+
   return (
     <div className="wrap">
       <header>
@@ -50,6 +60,10 @@ export default function Popup() {
 
       <button className={`toggle ${settings.enabled ? 'on' : ''}`} onClick={toggle} disabled={busy}>
         {busy ? '处理中…' : settings.enabled ? '✓ 翻译已开启' : '开启翻译'}
+      </button>
+
+      <button className="pdf-btn" onClick={translatePdf}>
+        📄 翻译当前页面 PDF
       </button>
 
       <div className="row">

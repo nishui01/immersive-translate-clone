@@ -32,6 +32,12 @@
     "page": "src/options/index.html",
     "open_in_tab": true
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["src/pdf/viewer.html", "pdf.worker.min.mjs"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "icons": {
     "16": "src/assets/icon16.png",
     "48": "src/assets/icon48.png",

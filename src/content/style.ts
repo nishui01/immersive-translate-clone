@@ -10,18 +10,16 @@ export function applyStyle(settings: Settings) {
     style.id = STYLE_ID
     document.documentElement.appendChild(style)
   }
-  const color = settings.translationColor || '#4F46E5'
-  const fontSize = settings.fontSize || 90
+  const color = settings.translationColor || '#6B7280'
+  const fontSize = settings.fontSize || 92
   style.textContent = `
     .it-translation {
       display: block;
-      width: 100%;
-      clear: both;
-      margin: 0.5em 0 0 !important;
+      margin: 3px 0 0 !important;
       padding: 0 !important;
       color: ${color} !important;
       font-size: ${fontSize}% !important;
-      line-height: 1.7 !important;
+      line-height: 1.6 !important;
       font-weight: 400 !important;
       font-style: normal !important;
       text-align: inherit !important;
@@ -29,10 +27,8 @@ export function applyStyle(settings: Settings) {
       word-break: break-word;
       overflow-wrap: break-word;
       transition: opacity 0.2s ease;
-      box-decoration-break: clone;
-      -webkit-box-decoration-break: clone;
     }
-    .it-translation.it-loading { opacity: 0.5; font-style: italic !important; font-size: 80% !important; }
+    .it-translation.it-loading { opacity: 0.5; font-style: italic !important; }
     .it-translation.it-error { color: #dc2626 !important; font-size: 80% !important; }
     #it-sel-popup {
       position: fixed;
