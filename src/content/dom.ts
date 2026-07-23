@@ -166,9 +166,24 @@ export function createTranslationEl(text: string, state: 'loading' | 'done' | 'e
 
 // Decide whether the translation for this element should be inserted as a
 // sibling (after it) or as a child. Sibling insertion avoids being affected by
-// floats / inline content inside the original element.
+// floats / inline content inside the original element — BUT it can break layout
+// when the parent uses flexbox or grid (the new <div> becomes a flex/grid item
+// and may jump to the start of the container). So we check the parent's
+// computed display and only use sibling insertion for normal block parents.
 function shouldInsertAsSibling(el: HTMLElement): boolean {
-  return SIBLING_INSERT_TAGS.has(el.tagName)
+  if (!SIBLING_INSERT_TAGS.has(el.tagName)) return false
+  const parent = el.parentElement
+  if (!parent) return false
+  // Cache-aware check: getComputedStyle can be expensive, but we only call it
+  // once per element during injection.
+  const parentDisplay = getComputedStyle(parent).display
+  // If the parent is a flex or grid container, inserting a sibling <div> would
+  // create a new flex/grid item and likely break the layout (e.g. the
+  // translation appears in the top-left corner). Fall back to child insertion.
+  if (parentDisplay.includes('flex') || parentDisplay.includes('grid')) {
+    return false
+  }
+  return true
 }
 
 export function injectTranslation(el: HTMLElement, text: string, state: 'loading' | 'done' | 'error') {

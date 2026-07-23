@@ -18,6 +18,14 @@ class PageTranslator {
   private runId = 0
   private observer: MutationObserver | null = null
   private debounceTimer: number | null = null
+  // Periodic re-scan timers for SPA pages that load content dynamically
+  // (e.g. MSN, React/Vue SPAs). After enabling, we re-scan every few seconds
+  // for a short window to catch late-arriving content that the initial pass
+  // and the MutationObserver might miss.
+  private rescanTimer: number | null = null
+  private rescanCount = 0
+  private static readonly RESCAN_INTERVAL = 3000 // 3 seconds
+  private static readonly RESCAN_MAX = 10 // 10 scans = ~30 seconds total
 
   configure(settings: Settings) {
     const prev = this.settings
@@ -45,6 +53,7 @@ class PageTranslator {
     this.enabled = true
     applyStyle(this.settings)
     this.startObserver()
+    this.startRescan()
     this.runId++
     void this.translateAll(this.runId)
   }
@@ -53,6 +62,7 @@ class PageTranslator {
     this.enabled = false
     this.runId++ // invalidate in-flight work
     this.stopObserver()
+    this.stopRescan()
     clearAllTranslations()
     removeStyle()
   }
@@ -91,11 +101,12 @@ class PageTranslator {
       }
       if (!external) return
       if (this.debounceTimer) window.clearTimeout(this.debounceTimer)
+      // Slightly longer debounce for SPA pages that load content in bursts.
       this.debounceTimer = window.setTimeout(() => {
         if (!this.enabled || !this.settings) return
         const id = this.runId
         void this.translateNew(id)
-      }, 400)
+      }, 600)
     })
     this.observer.observe(document.body, { childList: true, subtree: true })
   }
@@ -109,6 +120,34 @@ class PageTranslator {
     }
   }
 
+  /** Periodically re-scan for new content on SPA pages. */
+  private startRescan() {
+    this.stopRescan()
+    this.rescanCount = 0
+    this.rescanTimer = window.setInterval(() => {
+      if (!this.enabled || !this.settings) {
+        this.stopRescan()
+        return
+      }
+      this.rescanCount++
+      if (this.rescanCount > PageTranslator.RESCAN_MAX) {
+        this.stopRescan()
+        return
+      }
+      // Look for untranslated blocks; if found, translate them.
+      const id = this.runId
+      void this.translateNew(id)
+    }, PageTranslator.RESCAN_INTERVAL)
+  }
+
+  private stopRescan() {
+    if (this.rescanTimer) {
+      window.clearInterval(this.rescanTimer)
+      this.rescanTimer = null
+    }
+    this.rescanCount = 0
+  }
+
   private async translateAll(id: number) {
     const settings = this.settings!
     const blocks = collectBlocks(document.body, MAX_BLOCKS, settings.targetLang)
@@ -119,6 +158,8 @@ class PageTranslator {
   private async translateNew(id: number) {
     const settings = this.settings!
     if (id !== this.runId) return
+    // collectBlocks skips elements that already have data-it-translated,
+    // so this naturally finds only new/untranslated content.
     const blocks = collectBlocks(document.body, 200, settings.targetLang)
     if (!blocks.length) return
     await this.translateBlocks(blocks, id, settings)

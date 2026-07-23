@@ -18,16 +18,13 @@ export function applyStyle(settings: Settings) {
        - display:block so the translation always lives on its own line
        - clear:both so a floating image inside the original paragraph can't push
          the translation to the right or make it wrap early
-       - width:100% + box-sizing:border-box so the translation matches the
-         original element's content-box width and aligns to its left edge
+       - No explicit width: block elements naturally fill their container's
+         content width, and setting width:100% can cause overflow in padded
+         or flex containers (leading to the "top-left corner" bug)
        - inherit text-align so the translation follows the original alignment
-       - inherit font-family so the page's font stack is reused (better than
-         forcing a generic sans-serif which often clashes with the page)
     */
     .it-translation {
       display: block !important;
-      width: 100% !important;
-      box-sizing: border-box !important;
       clear: both !important;
       margin: 4px 0 0 !important;
       padding: 0 !important;

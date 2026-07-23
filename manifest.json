@@ -34,7 +34,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["src/pdf/viewer.html", "pdf.worker.min.mjs"],
+      "resources": ["src/pdf/viewer.html", "pdf.worker.min.mjs", "assets/*"],
       "matches": ["<all_urls>"]
     }
   ],
