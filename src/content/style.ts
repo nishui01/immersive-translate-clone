@@ -49,9 +49,10 @@ export function applyStyle(settings: Settings) {
       color: #dc2626 !important;
       font-size: 80% !important;
     }
-    /* Selection popup */
+    /* Selection popup — uses position:absolute (set inline) so it works even
+       when an ancestor has transform/filter (which would break position:fixed) */
     #it-sel-popup {
-      position: fixed;
+      position: absolute;
       z-index: 2147483647;
       max-width: 420px;
       min-width: 160px;

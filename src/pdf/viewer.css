@@ -165,38 +165,30 @@ html, body {
   overflow: visible;
   line-height: 1.15;
   pointer-events: auto;
-  /* Allow content to flow beyond the item's height for dual-mode translation
-     that appears below the original text */
+  /* z-index ensures translation (positioned below via top:100%) renders
+     above the canvas content of the next line */
+  z-index: 5;
 }
 
-/* Original text — in dual mode this is fully visible (not dimmed) so the
-   reader can compare original and translation. */
+/* Original text — hidden in all modes except original (canvas shows it) */
 .text-item .text-orig {
-  color: rgba(0, 0, 0, 0.85);
+  color: transparent;
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.15;
-  position: relative;
-  z-index: 1;
 }
 
-/* Translated text — appears BELOW the original in dual mode (not on top).
-   Background makes it readable over the canvas. */
+/* Translated text — position/background set by applyDisplayModeToItem() */
 .text-item .text-trans {
-  color: #1e40af;
-  background: rgba(255, 255, 255, 0.92);
-  padding: 1px 3px;
-  border-radius: 2px;
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.2;
+  padding: 1px 3px;
+  border-radius: 2px;
   display: none;
-  left: 0;
-  width: auto;
-  max-width: 200%;
 }
 
-/* When translation is available, show it */
+/* When translation is available, show it (display set inline by JS) */
 .text-item.translated .text-trans {
   display: block;
 }

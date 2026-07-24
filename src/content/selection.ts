@@ -45,14 +45,19 @@ function scheduleHide() {
 function positionPopup(rect: DOMRect) {
   const el = ensurePopup()
   const margin = 8
-  let top = rect.bottom + window.scrollY + margin
-  let left = rect.left + window.scrollX
-  // fixed positioning relative to viewport
-  el.style.position = 'fixed'
-  el.style.top = `${Math.min(rect.bottom + margin, window.innerHeight - 120)}px`
-  el.style.left = `${Math.max(margin, Math.min(rect.left, window.innerWidth - 440))}px`
-  void top
-  void left
+  // Use position:absolute with page coordinates (rect + scroll) instead of
+  // position:fixed. fixed positioning breaks when an ancestor has transform/
+  // filter/will-change (creating a containing block), causing the popup to jump
+  // to the top-left corner of that ancestor. absolute positioning relative to
+  // document.documentElement is robust against these CSS containment effects.
+  const pageTop = rect.bottom + window.scrollY + margin
+  const pageLeft = rect.left + window.scrollX
+  // Clamp within viewport (in page coordinates)
+  const maxTop = window.scrollY + window.innerHeight - 140
+  const maxLeft = window.scrollX + window.innerWidth - 440
+  el.style.position = 'absolute'
+  el.style.top = `${Math.min(pageTop, maxTop)}px`
+  el.style.left = `${Math.max(window.scrollX + margin, Math.min(pageLeft, maxLeft))}px`
 }
 
 export async function translateSelection() {

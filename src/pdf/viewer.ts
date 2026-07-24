@@ -233,44 +233,50 @@ function bindEvents() {
 function applyDisplayMode() {
   document.querySelectorAll('.page-wrapper').forEach((pw) => {
     const canvas = pw.querySelector('.page-canvas') as HTMLCanvasElement
-    const overlay = pw.querySelector('.page-text-layer') as HTMLElement
-    if (!canvas || !overlay) return
-
-    if (displayMode === 'original') {
-      // Only show the original PDF — hide all overlays, canvas full opacity
-      canvas.style.opacity = '1'
-      overlay.style.display = 'none'
-    } else if (displayMode === 'dual') {
-      // Dual mode: canvas stays fully visible (images/charts crisp), overlays
-      // show BOTH original text and translation below it.
-      canvas.style.opacity = '1'
-      overlay.style.display = ''
-      overlay.querySelectorAll('.text-item').forEach((item) => {
-        const orig = item.querySelector('.text-orig') as HTMLElement
-        const trans = item.querySelector('.text-trans') as HTMLElement
-        if (orig) orig.style.display = ''
-        // In dual mode, translation appears below the original, not on top
-        if (trans) {
-          trans.style.position = 'relative'
-          trans.style.top = '100%'
-        }
-      })
-    } else {
-      // Translation only: dim the canvas (chart/layout still faintly visible
-      // for context) and show only the translation
-      canvas.style.opacity = '0.25'
-      overlay.style.display = ''
-      overlay.querySelectorAll('.text-item').forEach((item) => {
-        const orig = item.querySelector('.text-orig') as HTMLElement
-        if (orig) orig.style.display = 'none'
-        const trans = item.querySelector('.text-trans') as HTMLElement
-        if (trans) {
-          trans.style.position = 'relative'
-          trans.style.top = '0'
-        }
-      })
-    }
+    if (canvas) canvas.style.opacity = '1'
+    pw.querySelectorAll('.text-item').forEach((item) => applyDisplayModeToItem(item as HTMLElement))
   })
+}
+
+/** Apply the current display mode to a single text-item element. */
+function applyDisplayModeToItem(item: HTMLElement) {
+  const orig = item.querySelector('.text-orig') as HTMLElement
+  const trans = item.querySelector('.text-trans') as HTMLElement
+
+  if (displayMode === 'original') {
+    item.style.display = 'none'
+    return
+  }
+  item.style.display = ''
+
+  if (displayMode === 'dual') {
+    // Hide extracted original text (canvas already shows it).
+    // Translation appears below the original text position.
+    if (orig) orig.style.display = 'none'
+    if (trans) {
+      trans.style.display = 'block'
+      trans.style.position = 'absolute'
+      trans.style.top = '100%'
+      trans.style.left = '0'
+      trans.style.width = 'auto'
+      trans.style.maxWidth = '200%'
+      trans.style.background = 'rgba(255, 255, 255, 0.95)'
+      trans.style.color = '#1e40af'
+    }
+  } else {
+    // Translation only: cover the original text position
+    if (orig) orig.style.display = 'none'
+    if (trans) {
+      trans.style.display = 'block'
+      trans.style.position = 'absolute'
+      trans.style.top = '0'
+      trans.style.left = '0'
+      trans.style.width = '100%'
+      trans.style.maxWidth = '100%'
+      trans.style.background = '#ffffff'
+      trans.style.color = '#1f2937'
+    }
+  }
 }
 
 function updateZoom() {
@@ -379,14 +385,10 @@ async function renderPage(pageNum: number) {
 
     pageWrapper.appendChild(renderArea)
 
-    // Apply current display mode
+    // Apply current display mode — canvas always at full opacity
+    canvas.style.opacity = '1'
     if (displayMode === 'original') {
-      canvas.style.opacity = '1'
       textLayer.style.display = 'none'
-    } else if (displayMode === 'dual') {
-      canvas.style.opacity = '1'
-    } else {
-      canvas.style.opacity = '0.25'
     }
 
     // Extract text and create overlays
@@ -580,15 +582,13 @@ async function translateLines(lines: TextLine[], textLayer: HTMLElement) {
       const trans = item.querySelector('.text-trans') as HTMLElement
       if (trans) {
         trans.textContent = translated
-        trans.style.display = ''
-        // In dual mode: translation sits below the original text (not on top)
-        if (displayMode === 'dual') {
-          trans.style.position = 'relative'
-          trans.style.top = '100%'
-        }
+        // Show the translation; applyDisplayMode will set position/background
+        trans.style.display = 'block'
       }
       // Mark as translated so CSS shows the translation
       item.classList.add('translated')
+      // Re-apply display mode to this item to ensure correct positioning
+      applyDisplayModeToItem(item)
     })
     // Yield to UI
     await new Promise((r) => setTimeout(r, 16))
