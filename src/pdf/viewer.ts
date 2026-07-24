@@ -237,22 +237,37 @@ function applyDisplayMode() {
     if (!canvas || !overlay) return
 
     if (displayMode === 'original') {
+      // Only show the original PDF — hide all overlays, canvas full opacity
       canvas.style.opacity = '1'
       overlay.style.display = 'none'
     } else if (displayMode === 'dual') {
-      canvas.style.opacity = '0.35'
+      // Dual mode: canvas stays fully visible (images/charts crisp), overlays
+      // show BOTH original text and translation below it.
+      canvas.style.opacity = '1'
       overlay.style.display = ''
       overlay.querySelectorAll('.text-item').forEach((item) => {
         const orig = item.querySelector('.text-orig') as HTMLElement
+        const trans = item.querySelector('.text-trans') as HTMLElement
         if (orig) orig.style.display = ''
+        // In dual mode, translation appears below the original, not on top
+        if (trans) {
+          trans.style.position = 'relative'
+          trans.style.top = '100%'
+        }
       })
     } else {
-      // translation only
-      canvas.style.opacity = '0.15'
+      // Translation only: dim the canvas (chart/layout still faintly visible
+      // for context) and show only the translation
+      canvas.style.opacity = '0.25'
       overlay.style.display = ''
       overlay.querySelectorAll('.text-item').forEach((item) => {
         const orig = item.querySelector('.text-orig') as HTMLElement
         if (orig) orig.style.display = 'none'
+        const trans = item.querySelector('.text-trans') as HTMLElement
+        if (trans) {
+          trans.style.position = 'relative'
+          trans.style.top = '0'
+        }
       })
     }
   })
@@ -369,9 +384,9 @@ async function renderPage(pageNum: number) {
       canvas.style.opacity = '1'
       textLayer.style.display = 'none'
     } else if (displayMode === 'dual') {
-      canvas.style.opacity = '0.35'
+      canvas.style.opacity = '1'
     } else {
-      canvas.style.opacity = '0.15'
+      canvas.style.opacity = '0.25'
     }
 
     // Extract text and create overlays
@@ -563,19 +578,16 @@ async function translateLines(lines: TextLine[], textLayer: HTMLElement) {
       if (!item) return
 
       const trans = item.querySelector('.text-trans') as HTMLElement
-      const orig = item.querySelector('.text-orig') as HTMLElement
       if (trans) {
         trans.textContent = translated
         trans.style.display = ''
+        // In dual mode: translation sits below the original text (not on top)
+        if (displayMode === 'dual') {
+          trans.style.position = 'relative'
+          trans.style.top = '100%'
+        }
       }
-      // In dual mode, show translation on top and dim original
-      if (orig) {
-        orig.style.opacity = '0.3'
-        orig.style.position = 'absolute'
-        orig.style.top = '0'
-        orig.style.left = '0'
-      }
-      // Make the item show translation prominently
+      // Mark as translated so CSS shows the translation
       item.classList.add('translated')
     })
     // Yield to UI

@@ -39,50 +39,57 @@ async function sendToActiveTab(message: RuntimeMessage): Promise<void> {
 chrome.runtime.onInstalled.addListener(async () => {
   // Seed default settings on first install.
   await getSettings()
-  // Context menu: translate selection.
-  try {
-    chrome.contextMenus.create({
-      id: 'translate-selection',
-      title: '翻译选中文本 (Translate selection)',
-      contexts: ['selection'],
-    })
-  } catch {
-    // already exists
-  }
-  // Context menu: open the current PDF page in our translator viewer.
-  // documentUrlPatterns restricts it to .pdf URLs so it only shows up where it's useful.
-  try {
-    chrome.contextMenus.create({
-      id: 'translate-pdf-page',
-      title: '📄 用沉浸式翻译打开此 PDF',
-      contexts: ['page'],
-      documentUrlPatterns: ['*://*/*.pdf', '*://*/*.pdf?*', '*://*/*.pdf#*', 'file:///*.pdf'],
-    })
-  } catch {
-    // already exists
-  }
-  // Context menu: open a PDF link target in our translator viewer.
-  try {
-    chrome.contextMenus.create({
-      id: 'translate-pdf-link',
-      title: '📄 用沉浸式翻译打开此 PDF 链接',
-      contexts: ['link'],
-      targetUrlPatterns: ['*://*/*.pdf', '*://*/*.pdf?*', '*://*/*.pdf#*', 'file:///*.pdf'],
-    })
-  } catch {
-    // already exists
-  }
-  // Context menu: a general entry that opens the viewer (file picker) from any page.
-  try {
-    chrome.contextMenus.create({
-      id: 'open-pdf-translator',
-      title: '📄 打开 PDF 翻译器',
-      contexts: ['page'],
-    })
-  } catch {
-    // already exists
-  }
+  setupContextMenus()
 })
+
+// Also rebuild menus on browser startup — onInstalled may not fire for a
+// re-loaded extension, so this ensures menus always exist.
+chrome.runtime.onStartup?.addListener(() => {
+  setupContextMenus()
+})
+
+function setupContextMenus() {
+  // Remove all existing menus first, then recreate. This avoids "already exists"
+  // errors and ensures menus are always present after extension reload.
+  try {
+    chrome.contextMenus.removeAll(() => {
+      // Translate selection (right-click on selected text)
+      chrome.contextMenus.create({
+        id: 'translate-selection',
+        title: '翻译选中文本 (Translate selection)',
+        contexts: ['selection'],
+      })
+      // Translate the entire page (right-click anywhere on a normal page)
+      chrome.contextMenus.create({
+        id: 'translate-page',
+        title: '🌐 翻译此页面 (Translate this page)',
+        contexts: ['page'],
+      })
+      // Open the current PDF page in our translator viewer (PDF pages only)
+      chrome.contextMenus.create({
+        id: 'translate-pdf-page',
+        title: '📄 用沉浸式翻译打开此 PDF',
+        contexts: ['page'],
+        documentUrlPatterns: ['*://*/*.pdf', '*://*/*.pdf?*', '*://*/*.pdf#*', 'file:///*.pdf'],
+      })
+      // Open a PDF link target in our translator viewer (PDF links only)
+      chrome.contextMenus.create({
+        id: 'translate-pdf-link',
+        title: '📄 用沉浸式翻译打开此 PDF 链接',
+        contexts: ['link'],
+        targetUrlPatterns: ['*://*/*.pdf', '*://*/*.pdf?*', '*://*/*.pdf#*', 'file:///*.pdf'],
+      })
+      // Open PDF translator viewer (file picker) from any page
+      chrome.contextMenus.create({
+        id: 'open-pdf-translator',
+        title: '📄 打开 PDF 翻译器',
+        contexts: ['page'],
+      })
+    })
+  } catch {
+    // ignore
+  }
+}
 
 function openPdfViewer(fileUrl?: string) {
   const viewerBase = chrome.runtime.getURL('src/pdf/viewer.html')
@@ -109,6 +116,31 @@ chrome.contextMenus?.onClicked.addListener((info, tab) => {
       } catch {
         // ignore
       }
+      return
+    }
+    case 'translate-page': {
+      // Toggle translation on the current page.
+      const tabId = tab?.id
+      if (tabId == null) return
+      void (async () => {
+        const settings = await getSettings()
+        const next = !settings.enabled
+        await saveSettings({ enabled: next })
+        try {
+          await chrome.tabs.sendMessage(tabId, { type: 'TOGGLE_TRANSLATION' })
+        } catch {
+          // content script may not be loaded; try scripting API as fallback
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId },
+              files: ['assets/index.ts-loader.js'],
+            })
+            await chrome.tabs.sendMessage(tabId, { type: 'TOGGLE_TRANSLATION' })
+          } catch {
+            // ignore
+          }
+        }
+      })()
       return
     }
     case 'translate-pdf-page': {

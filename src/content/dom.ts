@@ -2,11 +2,22 @@
 
 const TRANSLATABLE_TAGS = new Set([
   'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'BLOCKQUOTE', 'TD', 'TH',
-  'FIGCAPTION', 'DT', 'DD', 'SUMMARY', 'CAPTION', 'ARTICLE', 'SECTION',
-  'MAIN', 'ASIDE', 'DETAILS',
+  'FIGCAPTION', 'DT', 'DD', 'SUMMARY', 'CAPTION',
+  // NOTE: ARTICLE/SECTION/MAIN/ASIDE/DETAILS are intentionally NOT here —
+  // they are semantic containers, not text blocks. Including them would make
+  // collectBlocks treat the entire <article> as one unit and stop descending,
+  // missing the real <p> tags inside (this was the MSN bug).
 ])
 // div/span are only translated when they have no element children (pure text leaves).
 const LEAF_TEXT_TAGS = new Set(['DIV', 'SPAN', 'A', 'STRONG', 'EM', 'B', 'I'])
+// Inline element tags — if a div's children are all inline, the div is treated
+// as a single translation unit (this is what makes MSN/SPA pages translate,
+// since they often use <div><span>text</span> more text</div> instead of <p>).
+const INLINE_TAGS = new Set([
+  'SPAN', 'A', 'STRONG', 'EM', 'B', 'I', 'U', 'S', 'SMALL', 'BIG', 'SUB',
+  'SUP', 'MARK', 'ABBR', 'CITE', 'Q', 'CODE', 'BR', 'WBR', 'BDO', 'BDI',
+  'TIME', 'DATA', 'FONT', 'TT', 'LABEL', 'NOBR',
+])
 const EXCLUDE_TAGS = new Set([
   'SCRIPT', 'STYLE', 'NOSCRIPT', 'CODE', 'PRE', 'KBD', 'SAMP', 'TEXTAREA',
   'INPUT', 'SELECT', 'OPTION', 'SVG', 'OBJECT', 'VIDEO', 'AUDIO', 'CANVAS',
@@ -45,6 +56,17 @@ function hasElementChildren(el: Element): boolean {
     if (el.children[i].nodeType === 1) return true
   }
   return false
+}
+
+/** Check if all element children of el are inline tags (span/a/strong/etc). */
+function hasOnlyInlineChildren(el: Element): boolean {
+  if (el.children.length === 0) return false // no children → leaf, handled elsewhere
+  for (let i = 0; i < el.children.length; i++) {
+    const child = el.children[i]
+    if (child.nodeType !== 1) continue
+    if (!INLINE_TAGS.has(child.tagName)) return false
+  }
+  return true
 }
 
 function meaningfulText(el: Element): string {
@@ -119,6 +141,10 @@ export function collectBlocks(
   // Manual DFS so that once a block-level element is collected we do NOT recurse
   // into its descendants — this is what prevents duplicate translations of nested
   // inline elements (e.g. <strong>/<span> inside a <p>).
+  //
+  // Shadow DOM support: when we encounter an element with a shadowRoot, we also
+  // push its shadow children onto the stack. This is essential for sites like
+  // MSN that render article content inside <cp-article>'s shadow DOM.
   const stack: Element[] = []
   const startNodes = rootEl.children?.length ? Array.from(rootEl.children) : [rootEl]
   for (let i = startNodes.length - 1; i >= 0; i--) stack.push(startNodes[i])
@@ -134,8 +160,11 @@ export function collectBlocks(
     const tag = el.tagName
     const isBlock = TRANSLATABLE_TAGS.has(tag)
     const isLeafText = LEAF_TEXT_TAGS.has(tag) && !hasElementChildren(el)
+    // MSN/SPA fix: a div that only contains inline children (span/a/strong)
+    // is treated as a translation unit — this catches <div><span>text</span> more</div>
+    const isInlineOnlyDiv = tag === 'DIV' && hasOnlyInlineChildren(el)
 
-    if (isBlock || isLeafText) {
+    if (isBlock || isLeafText || isInlineOnlyDiv) {
       const text = meaningfulText(el)
       if (isWorthTranslating(text)) {
         const sameLang = targetLang ? isLikelySameLanguage(text, targetLang) : false
@@ -143,6 +172,11 @@ export function collectBlocks(
           out.push({ el: el as HTMLElement, text })
         }
         // Treat this element as a single translation unit; do not descend.
+        // But still check for shadow DOM (rare for text blocks, but safe).
+        if (el.shadowRoot) {
+          const shadowKids = el.shadowRoot.children
+          for (let i = shadowKids.length - 1; i >= 0; i--) stack.push(shadowKids[i])
+        }
         continue
       }
       // Not worth translating (e.g. empty): still descend to find inner content.
@@ -151,6 +185,12 @@ export function collectBlocks(
     // Recurse: push children in reverse so they are visited in document order.
     const kids = el.children
     for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i])
+
+    // Shadow DOM: also traverse into shadow roots (key for MSN <cp-article>).
+    if (el.shadowRoot) {
+      const shadowKids = el.shadowRoot.children
+      for (let i = shadowKids.length - 1; i >= 0; i--) stack.push(shadowKids[i])
+    }
   }
   return out
 }

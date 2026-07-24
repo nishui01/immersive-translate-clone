@@ -112,6 +112,24 @@ class PageTranslator {
       }, 600)
     })
     this.observer.observe(document.body, { childList: true, subtree: true })
+
+    // Also observe Shadow DOM roots — MSN renders article content inside
+    // <cp-article>'s shadow DOM, so we need to watch there too.
+    this.observeShadowRoots(document.body)
+  }
+
+  /** Recursively find and observe all shadow roots in the document. */
+  private observeShadowRoots(root: Element) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT)
+    let node: Element | null = root
+    while (node) {
+      if (node.shadowRoot) {
+        this.observer?.observe(node.shadowRoot, { childList: true, subtree: true })
+        // Recursively observe nested shadow roots
+        this.observeShadowRoots(node.shadowRoot as unknown as Element)
+      }
+      node = walker.nextNode() as Element | null
+    }
   }
 
   private stopObserver() {

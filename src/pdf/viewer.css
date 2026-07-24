@@ -165,41 +165,40 @@ html, body {
   overflow: visible;
   line-height: 1.15;
   pointer-events: auto;
+  /* Allow content to flow beyond the item's height for dual-mode translation
+     that appears below the original text */
 }
 
-/* Original text (shown in dual mode, dimmed) */
+/* Original text — in dual mode this is fully visible (not dimmed) so the
+   reader can compare original and translation. */
 .text-item .text-orig {
-  color: rgba(0, 0, 0, 0.25);
+  color: rgba(0, 0, 0, 0.85);
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.15;
+  position: relative;
+  z-index: 1;
 }
 
-/* Translated text (shown prominently, covers original) */
+/* Translated text — appears BELOW the original in dual mode (not on top).
+   Background makes it readable over the canvas. */
 .text-item .text-trans {
   color: #1e40af;
-  background: rgba(255, 255, 255, 0.88);
-  padding: 0 2px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 1px 3px;
   border-radius: 2px;
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.15;
+  line-height: 1.2;
   display: none;
-  position: absolute;
-  top: 0;
   left: 0;
-  width: 100%;
+  width: auto;
+  max-width: 200%;
 }
 
 /* When translation is available, show it */
 .text-item.translated .text-trans {
   display: block;
-}
-
-/* In dual mode: both original and translation are visible */
-.text-item .text-orig {
-  position: relative;
-  z-index: 1;
 }
 
 /* ── Loading & status indicators ── */
